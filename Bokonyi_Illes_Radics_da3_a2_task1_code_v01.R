@@ -1,3 +1,6 @@
+
+# Test
+
 cat("\f")
 rm(list=ls())
 
@@ -14,7 +17,7 @@ library(ggplot2)
 library(lspline)
 
 ################################################################################################################################################################
-# 1. Download cross-country data on life expectancy and GDP per capita. “GDP per capita, PPP (constant)” and “Life expectancy at birth (total)” Delete unnecessary columns and save a csv file with three columns only: country name, life expectancy and GDP per capita. Keep countries with non-missing values for life expectancy and GDP per capita. Document what you do. 
+# 1. Download cross-country data on life expectancy and GDP per capita. ?GDP per capita, PPP (constant)? and ?Life expectancy at birth (total)? Delete unnecessary columns and save a csv file with three columns only: country name, life expectancy and GDP per capita. Keep countries with non-missing values for life expectancy and GDP per capita. Document what you do. 
 ################################################################################################################################################################
 
 GDP <- wb(indicator = "NY.GDP.PCAP.PP.KD", startdate = 2011, enddate = 2011)
