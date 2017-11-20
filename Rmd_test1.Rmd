@@ -1,0 +1,274 @@
+---
+title: "HA2_DA3"
+author: "Bokonyi Gabor; Illes Gabor; Radics Gabor"
+date: "26/11/2017"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+
+## Problem #2.1
+```{r, echo=FALSE}
+setwd("/Volumes/Mac_500GB_SSD/IG_Docs/CEU/Lectures/DA_3/HA_test")
+library(wbstats)
+library(data.table)
+library(ggplot2)
+library(lspline)
+library(rmarkdown)
+```
+
+## 1. Data acquisition and cleaning
+#### Download cros-county 'GDP per capita' data
+```{r}
+GDP <- wb(indicator = "NY.GDP.PCAP.PP.KD", startdate = 2011, enddate = 2011)
+```
+#### Change coloumn names
+```{r}
+setnames(GDP, 'value', 'GDP_per_capita')
+setnames(GDP, 'country', 'country_name')
+```
+#### Download cros-county 'Life Expectancy' data
+```{r}
+LEX <- wb(indicator = "SP.DYN.LE00.IN", startdate = 2011, enddate = 2011)
+```
+#### Change coloumn names
+```{r}
+setnames(LEX, 'value', 'life_expectancy')
+```
+#### Merge the two datasets by 'iso2c' code
+```{r}
+P21 <- data.table(merge(GDP[, c('iso2c', 'country_name', 'GDP_per_capita')], LEX[, c('iso2c', 'life_expectancy')], by = 'iso2c', all.x = TRUE, all.y = TRUE))
+```
+#### Drop observations with missing values and write csv file
+```{r}
+P21 <- P21[(GDP_per_capita != 'NA' & life_expectancy != 'NA'),]
+write.csv(P21[, c('country_name', 'life_expectancy', 'GDP_per_capita')], 'P21.csv')
+```
+
+## 2. Estimate regressions
+#### Histogram of 'Life Expectancy'
+```{r, echo=FALSE}
+ggplot(P21, aes(x = life_expectancy)) + geom_histogram(binwidth = 1, colour = "darkgreen", fill ="darkgreen") + ggtitle("life expectancy (ys)")
+```
+some explanation here
+
+#### Histogram of 'GDP per capita'
+```{r, echo= FALSE}
+ggplot(P21, aes(x = GDP_per_capita)) + geom_histogram(binwidth = 1000, colour = "darkgreen", fill ="darkgreen") + ggtitle("GDP per capita")
+```
+some explanation here
+
+```{r, echo=FALSE}
+P21[, `:=`(
+  GDP_per_capita_M = GDP_per_capita / 1000, 
+  GDP_per_capita_M_sq = (GDP_per_capita / 1000) ^ 2,
+  GDP_per_capita_M_cub = (GDP_per_capita / 1000) ^ 3,
+  GDP_per_capita_log = log(GDP_per_capita)
+),]
+```
+
+#### Lowess regression of 'Life Expectancy' on ln 'Gdp per capita'
+
+```{r, echo=FALSE}
+ggplot(P21, aes(GDP_per_capita_log, life_expectancy)) + 
+  geom_point(size = 1.5, colour="orange", shape = 4) + 
+  geom_smooth(colour = "darkgreen") + 
+  labs(x="GDP per capita - log", y="life expectancy (ys)") +
+  ggtitle("lowess regression")
+```
+some explanation here
+
+#### Summary statistics of Lowess regression of 'Life Expectancy' on ln 'Gdp per capita'
+```{r, echo=FALSE}
+#ls <- lowess(life_expectancy ~ GDP_per_capita_log, data = P21)
+#ls2 <- lowess(P21$GDP_per_capita_log, P21$life_expectancy)
+#summary(ls2)
+```
+
+
+#### Simple Linear Regression of 'Life Expectancy' on 'Gdp per capita'
+
+```{r, echo=FALSE}
+slr <- lm(life_expectancy ~ GDP_per_capita_M, data = P21)
+
+ggplot(data = slr, aes(x=GDP_per_capita_M, y=life_expectancy)) +
+  geom_point(size=1.5, colour="orange",shape=4) +
+  geom_smooth(method="lm", colour="darkgreen", se=FALSE)+
+  labs(x="GDP per capita (M$)",y="life expectancy (ys)")+
+  ggtitle("simple linear regression")
+```
+some explanation here
+
+
+##### Summary statistics of 'Life Expectancy' on 'Gdp per capita'
+```{r, echo=FALSE}
+summary(slr)
+```
+some explanation here
+
+
+#### Level-log linear regression of 'Life Expectancy' on 'Gdp per capita'
+
+```{r, echo=FALSE}
+levellog <- lm(life_expectancy ~ GDP_per_capita_log, P21)
+
+ggplot(data = P21, aes(x=GDP_per_capita_log, y=life_expectancy)) +
+  geom_point(size=1.5, colour="orange") +
+  labs(x="GDP per capita - log",y="life expectancy (ys)")+
+  geom_smooth(method="lm", colour="darkgreen", se=F)+
+  ggtitle("level-log linear regression")
+```
+some explanation here
+
+##### Summary statistics of level-log regression of 'Life Expectancy' on 'Gdp per capita'
+```{r, echo=FALSE}
+summary(levellog)
+```
+some explanation here
+
+
+
+#### Piecewise linear spline of 'Life Expectancy' on 'Gdp per capita' (lspline)
+
+```{r, echo=FALSE}
+pls <- lm(life_expectancy ~ lspline(GDP_per_capita_M, c(25)), data=P21)
+P21$pls<-predict(pls)
+
+ggplot(data = P21, aes(x=GDP_per_capita_M, y=life_expectancy)) +
+  geom_point(size=1.5, colour="orange",shape=4) +
+  labs(x="GDP per capita (M$)", y="life expectancy (ys)")+
+  geom_line(data = P21,aes(x=GDP_per_capita_M, y=pls),colour="darkgreen")+
+  geom_vline(xintercept=25,colour="red")+
+  ggtitle("piecewise linear spline")
+```
+some explanation here
+
+##### Summary statistics of linear spline of 'Life Expectancy' on 'Gdp per capita'
+```{r, echo=FALSE}
+summary(pls)
+```
+some explanation here
+
+
+#### Quadratic regression of 'Life Expectancy' on 'Gdp per capita'
+
+```{r, echo=FALSE}
+quad <- lm(life_expectancy ~ GDP_per_capita_M + GDP_per_capita_M_sq, P21)
+P21$pred_quad<-predict(quad)
+
+ggplot(data = P21, aes(x=GDP_per_capita_M, y=life_expectancy)) +
+  geom_point(size=1.5, colour="orange",shape=4) +
+  labs(x="GDP per capita (M$)", y="life expectancy (ys)")+
+  geom_line(data=P21, aes(x=GDP_per_capita_M,y=pred_quad), colour="darkgreen")+
+  ggtitle("quadratic model")
+
+
+
+
+```
+some explanation here
+
+##### Summary statistics of Quadratic regression of 'Life Expectancy' on 'Gdp per capita'
+```{r, echo=FALSE}
+summary(quad)
+```
+some explanation here
+
+
+#### Cubic regression of 'Life Expectancy' on 'Gdp per capita'
+
+```{r, echo=FALSE}
+cub <- lm(life_expectancy ~ GDP_per_capita_M + GDP_per_capita_M_sq + GDP_per_capita_M_cub, P21)
+P21$pred_cub<-predict(cub)
+
+ggplot(data = P21, aes(x=GDP_per_capita_M, y=life_expectancy)) +
+  geom_point(size=1.5, colour="orange",shape=4) +
+  labs(x="GDP per capita (M$)", y="life expectancy (ys)")+
+  geom_line(data=P21, aes(x=GDP_per_capita_M, y=pred_cub), colour="darkgreen")+
+  ggtitle("cubic model")
+
+
+
+
+```
+some explanation here
+
+##### Summary statistics of Cubic regression of 'Life Expectancy' on 'Gdp per capita'
+```{r, echo=FALSE}
+summary(cub)
+```
+some explanation here
+
+
+## 3. Estimate a weighted regression 
+
+```{r, include=FALSE}
+wbsearch(pattern = "Population, total")
+POP <- wb(indicator = "SP.POP.TOTL", startdate = 2011, enddate = 2011)
+setnames(POP, 'value', 'population')
+PS21w <- data.table(merge(P21, POP[, c('iso2c', 'population')], by = 'iso2c'))
+PS21w$population_MM <- PS21w$population / 1000000
+
+
+
+
+```
+
+#### weighted level-log linear regression
+
+
+```{r, echo=FALSE}
+w_levellog <- lm(life_expectancy ~ GDP_per_capita_log, data = PS21w, weights = population_MM)
+
+ggplot(data = PS21w, aes(x=GDP_per_capita_log, y=life_expectancy, size=population_MM)) +
+  geom_point(colour="orange") +
+  labs(x="GDP per capita - log",y="life expectancy (ys)")+
+  geom_smooth(method="lm", colour="darkgreen", se=F)+
+  ggtitle("weighted level-log linear regression")
+
+
+
+
+```
+some explanation here
+
+
+```{r, echo=FALSE}
+summary(w_levellog)
+
+
+
+
+```
+some explanation here
+
+
+
+
+
+
+
+```{r, echo=FALSE}
+
+
+
+
+```
+
+
+```{r, echo=FALSE}
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
